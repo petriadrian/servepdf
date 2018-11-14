@@ -2,8 +2,10 @@ import com.itextpdf.awt.PdfGraphics2D;
 import com.itextpdf.text.*;
 import com.itextpdf.text.Font;
 import com.itextpdf.text.Font.FontFamily;
+import com.itextpdf.text.Rectangle;
 import com.itextpdf.text.pdf.*;
 import org.jfree.chart.ChartFactory;
+import org.jfree.chart.JFreeChart;
 import org.jfree.data.general.DefaultPieDataset;
 
 import java.awt.*;
@@ -20,6 +22,7 @@ import static com.itextpdf.text.Font.NORMAL;
 import static com.itextpdf.text.PageSize.A4;
 import static com.itextpdf.text.Rectangle.NO_BORDER;
 import static com.itextpdf.text.Rectangle.TOP;
+import static org.jfree.chart.ChartFactory.createPieChart;
 
 public class ServePdfDoc {
 
@@ -27,7 +30,6 @@ public class ServePdfDoc {
     public static final int FONT_SIZE = 12;
     public static final int A4_MARGIN = 20;
     public static final int PIE_CHART_HEIGHT = 200;
-    public static final float PIE_CHART_WIDTH = A4.getWidth() - (A4_MARGIN * 2);
 
     public static void main(String[] args) {
         buildBenefitsPdf("/home/ralucaf/projects/servepdf/piechart.pdf", BLUE);
@@ -36,22 +38,30 @@ public class ServePdfDoc {
     public static void buildBenefitsPdf(String fileName, BaseColor headlineColor) {
 
         Document document = new Document(A4, A4_MARGIN, A4_MARGIN, A4_MARGIN, A4_MARGIN);
+        document.open();
+        PdfPTable pageLayout = new PdfPTable(1);
+        pageLayout.setWidthPercentage(100);
+        pageLayout.getDefaultCell().setBorder(0);
+        pageLayout.addCell(buildIntroText());
+        pageLayout.addCell(buildPieChartCell());
+        document.close();
 
-        try {
-            PdfWriter pdfWriter = PdfWriter.getInstance(document, new FileOutputStream(fileName));
-            document.open();
-            document.add(buildHeaderText("CASH COMPENSATION AND BENEFITS SUMMARY", headlineColor));
+
+        document.add();
             document.add(NEWLINE);
             document.add(buildText("text text text text text text text text text text text text text text text text text text text text text text text text text text text text text "));
             document.add(NEWLINE);
             document.add(buildCompensationTable(headlineColor));
             document.add(NEWLINE);
             document.add(buildBenefitsTable(headlineColor));
-            generatePieChart(pdfWriter.getDirectContent());
-        } catch (Exception e) {
-            e.printStackTrace();
+            document.add(NEWLINE);
+            document.add(pageLayout);
+//            buildPieChart(pdfWriter.getDirectContent());
         }
-        document.close();
+
+    private static String buildIntroText(BaseColor headlineColor) {
+        PdfPCell cell = new PdfPCell();
+        cell.addElement(buildHeaderText("CASH COMPENSATION AND BENEFITS SUMMARY", headlineColor));
     }
 
     private static PdfPTable buildCompensationTable(BaseColor headlineColor) {
@@ -98,21 +108,16 @@ public class ServePdfDoc {
         return table;
     }
 
-    public static void generatePieChart(PdfContentByte contentByte) {
+    public static PdfPCell buildPieChartCell() {
         DefaultPieDataset dataSet = new DefaultPieDataset();
         dataSet.setValue("Total salary", 19.64);
         dataSet.setValue("Flex Allowance", 17.3);
         dataSet.setValue("Company contribution", 4.54);
-        dataSet.setValue("test", 3.4);
-        dataSet.setValue("test2", 2.83);
-        dataSet.setValue("test3", 2.48);
-        dataSet.setValue("test4", 2.38);
-        PdfTemplate pie = contentByte.createTemplate(PIE_CHART_WIDTH, PIE_CHART_HEIGHT);
-        Graphics2D graphics2d = new PdfGraphics2D(pie, PIE_CHART_WIDTH, PIE_CHART_HEIGHT);
-        Rectangle2D rectangle2d = new Rectangle2D.Float(0, 0, PIE_CHART_WIDTH, PIE_CHART_HEIGHT);
-        ChartFactory.createPieChart("", dataSet, true, true, false).draw(graphics2d, rectangle2d);
-        graphics2d.dispose();
-        contentByte.addTemplate(pie, A4_MARGIN, PIE_CHART_HEIGHT);
+        PdfPCell cell = new PdfPCell();
+        cell.setCellEvent(new JFreeChartEvent(createPieChart("", dataSet, true, true, false)));
+        cell.setFixedHeight(PIE_CHART_HEIGHT);
+        cell.setBorder(NO_BORDER);
+        return cell;
     }
 
     public static PdfPCell buildHeaderCell(String text, BaseColor color) {
@@ -150,6 +155,25 @@ public class ServePdfDoc {
 
     private static Phrase buildTextRoot(String content, BaseColor color, int fontStyle) {
         return new Phrase(content, new Font(FONT_FAMILY, FONT_SIZE, fontStyle, color));
+    }
+
+}
+
+class JFreeChartEvent implements PdfPCellEvent {
+    private JFreeChart chart;
+
+    public JFreeChartEvent(final JFreeChart chart){
+        this.chart = chart;
+    }
+
+    public void cellLayout(PdfPCell pdfPCell, Rectangle rectangle, PdfContentByte[] pdfContentBytes) {
+        PdfContentByte cb = pdfContentBytes[PdfPTable.TEXTCANVAS]; //optional, can be other canvas
+        PdfTemplate pie = cb.createTemplate(rectangle.getWidth(), rectangle.getHeight());
+        Graphics2D g2d1 = new PdfGraphics2D(pie, rectangle.getWidth(), rectangle.getHeight());
+        Rectangle2D r2d1 = new Rectangle2D.Double(0, 0, rectangle.getWidth(), rectangle.getHeight());
+        chart.draw(g2d1, r2d1);
+        g2d1.dispose();
+        cb.addTemplate(pie, rectangle.getLeft(), rectangle.getBottom());
     }
 
 }
