@@ -42,12 +42,12 @@ public class PDfDocBuilder {
     public PDfDocBuilder(BaseColor headlineColor) throws FileNotFoundException, DocumentException {
         this.headlineColor = headlineColor;
         document = new Document(A4, A4_MARGIN, A4_MARGIN, A4_MARGIN, A4_MARGIN);
-        getInstance(document, new FileOutputStream("/home/ralucaf/projects/servepdf/piechart.pdf"));
+//        getInstance(document, new FileOutputStream("/home/ralucaf/projects/servepdf/piechart.pdf"));
+        getInstance(document, new FileOutputStream("C:\\myprojects\\servepdf\\piechart.pdf"));
         document.open();
         pageLayout = new PdfPTable(1);
         pageLayout.setWidthPercentage(100);
         pageLayout.getDefaultCell().setBorder(0);
-        document.add(pageLayout);
     }
 
     public PDfDocBuilder withParagraph(String title, String content) {
@@ -58,15 +58,20 @@ public class PDfDocBuilder {
         if (isNotBlank(content)) {
             cell.addElement(buildTextDefault(content));
         }
-        if (isBlank(title) && isBlank(content)) {
-            cell.addElement(NEWLINE);
-        }
+        cell.setBorder(NO_BORDER);
+        pageLayout.addCell(cell);
+        return this.withEmptyRow();
+    }
+
+    public PDfDocBuilder withEmptyRow() {
+        PdfPCell cell = new PdfPCell();
+        cell.addElement(NEWLINE);
         cell.setBorder(NO_BORDER);
         pageLayout.addCell(cell);
         return this;
     }
 
-    public PDfDocBuilder withBenefitsTable(List<BenefitsTable> benefitsTables, String totalYourContribution, String totalCompanyContribution) {
+    public PDfDocBuilder withBenefitsTable(List<BenefitsRow> benefitsRows, String totalYourContribution, String totalCompanyContribution) {
         PdfPTable table = new PdfPTable(new float[]{2, 1, 1, 1, 1});
         table.getDefaultCell().setBorder(0);
         table.setWidthPercentage(100);
@@ -75,7 +80,7 @@ public class PDfDocBuilder {
         table.addCell(buildHeaderCell("Coverage", headlineColor));
         table.addCell(buildHeaderCell("Your contribution", headlineColor));
         table.addCell(buildHeaderCell("Company contribution", headlineColor));
-        benefitsTables.forEach((item) -> {
+        benefitsRows.forEach((item) -> {
             table.addCell(buildCell(item.getBenefit()));
             table.addCell(buildCell(item.getPlan()));
             table.addCell(buildCell(item.getCoverage()));
@@ -88,21 +93,37 @@ public class PDfDocBuilder {
         table.addCell(buildTotalCell(totalYourContribution));
         table.addCell(buildTotalCell(totalCompanyContribution));
         pageLayout.addCell(table);
-        return this;
+        return this.withEmptyRow();
     }
 
-    public PDfDocBuilder withPieChart(Map<String, Float> infoAndSize) {
-        DefaultPieDataset dataSet = new DefaultPieDataset();
-        infoAndSize.forEach(dataSet::setValue);
+    public PDfDocBuilder withCompensationTable(List<CompensationRow> benefitsTables, String totalAmount) {
+        PdfPTable table = new PdfPTable(new float[]{3, 1});
+        table.getDefaultCell().setBorder(0);
+        table.setWidthPercentage(100);
+        table.addCell(buildHeaderCell("Direct Compensation", headlineColor));
+        table.addCell(buildHeaderCell("Amount", headlineColor));
+        benefitsTables.forEach((item) -> {
+            table.addCell(buildCell(item.getDirectCompensation()));
+            table.addCell(buildCell(item.getAmount()));
+        });
+        table.addCell(buildTotalHeaderCell());
+        table.addCell(buildTotalCell(totalAmount));
+        pageLayout.addCell(table);
+        return this.withEmptyRow();
+    }
+
+    public PDfDocBuilder withPieChart(List<InfoAndSize> infoAndSize) {
+        DefaultPieDataset pie = new DefaultPieDataset();
+        infoAndSize.forEach((item) -> pie.setValue(item.getInfo(), item.getSize()));
         PdfPCell cell = new PdfPCell();
-        cell.setCellEvent(new JFreeChartEvent(createPieChart("", dataSet, true, true, false)));
+        cell.setCellEvent(new JFreeChartEvent(createPieChart("", pie, true, true, false)));
         cell.setFixedHeight(PIE_CHART_HEIGHT);
         cell.setBorder(NO_BORDER);
         pageLayout.addCell(cell);
-        return this;
+        return this.withEmptyRow();
     }
 
-    public PDfDocBuilder buildTotalEquation(String totalSalary, String flexBenefit, String cieContribution, String totalReward) {
+    public PDfDocBuilder withTotalEquation(String totalSalary, String flexBenefit, String cieContribution, String totalReward) {
         PdfPTable table = new PdfPTable(new float[]{3, 1, 3, 1, 3, 1, 3});
         table.getDefaultCell().setBorder(0);
         table.setWidthPercentage(100);
@@ -114,10 +135,11 @@ public class PDfDocBuilder {
         table.addCell(buildAlignMiddleCell(buildTextDefault("="), NO_BORDER));
         table.addCell(buildEquationCell("Total Reward", totalReward, headlineColor));
         pageLayout.addCell(table);
-        return this;
+        return this.withEmptyRow();
     }
 
-    public void build() {
+    public void build() throws DocumentException {
+        document.add(pageLayout);
         document.close();
     }
 
@@ -189,34 +211,80 @@ public class PDfDocBuilder {
 
 }
 
-class BenefitsTable {
+class InfoAndSize {
+    private String info = "";
+    private float size = 0;
+
+    public InfoAndSize withInfo(String info) {
+        this.info = info;
+        return this;
+    }
+
+    public InfoAndSize withSize(float size) {
+        this.size = size;
+        return this;
+    }
+
+    public String getInfo() {
+        return info;
+    }
+
+    public float getSize() {
+        return size;
+    }
+}
+
+class CompensationRow {
+    private String directCompensation = "";
+    private String amount = "";
+
+    public CompensationRow withDirectCompensation(String directCompensation) {
+        this.directCompensation = directCompensation;
+        return this;
+    }
+
+    public CompensationRow withAmount(String amount) {
+        this.amount = amount;
+        return this;
+    }
+
+    public String getDirectCompensation() {
+        return directCompensation;
+    }
+
+    public String getAmount() {
+        return amount;
+    }
+}
+
+class BenefitsRow {
     private String benefit = "";
     private String plan = "";
     private String coverage = "";
     private String yourContribution = "";
     private String companyContribution = "";
 
-    public BenefitsTable withBenefit(String benefit) {
+    public BenefitsRow withBenefit(String benefit) {
         this.benefit = benefit;
         return this;
     }
 
-    public BenefitsTable withPlan(String plan) {
+    public BenefitsRow withPlan(String plan) {
         this.plan = plan;
         return this;
     }
 
-    public BenefitsTable withCoverage(String coverage) {
+    public BenefitsRow withCoverage(String coverage) {
         this.coverage = coverage;
         return this;
     }
 
-    public BenefitsTable withYourContribution(String yourContribution) {
+    public BenefitsRow withYourContribution(String yourContribution) {
         this.yourContribution = yourContribution;
         return this;
     }
 
-    public BenefitsTable withCompanyContribution(String companyContribution) {
+    public BenefitsRow withCompanyContribution(String companyContribution) {
         this.companyContribution = companyContribution;
         return this;
     }
